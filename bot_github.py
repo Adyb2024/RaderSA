@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 ═══════════════════════════════════════════════════════════════════════════
-📡 Telegram Lead Radar Bot - GitHub Actions Edition
+📡 Telegram Lead Radar Bot - GitHub Actions Edition (Persistent Cache)
 ═══════════════════════════════════════════════════════════════════════════
 """
 
@@ -16,6 +16,7 @@ import threading
 import traceback
 import signal
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from functools import wraps
@@ -51,7 +52,8 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 API_ID = int(os.environ.get("TELEGRAM_API_ID", 0))
 API_HASH = os.environ.get("TELEGRAM_API_HASH", "")
-DATA_DIR = Path("./data")          # تغيير المسار ليناسب GitHub Actions
+RUN_DURATION = int(os.environ.get("RUN_DURATION", 3000))  # 50 دقيقة افتراضيًا
+DATA_DIR = Path("./data")
 DB_PATH = DATA_DIR / "users.db"
 USER_BLOCKS_DIR = DATA_DIR / "user_blocks"
 USER_KEYWORDS_DIR = DATA_DIR / "user_keywords"
@@ -255,7 +257,7 @@ def is_text_blocked(user_id: int, text: str) -> bool:
     return normalize_text(text) in load_user_blocklist(user_id, "blocked_texts")
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 🧵 مدير جلسات Telethon (مطابق للنسخة الفعّالة)
+# 🧵 مدير جلسات Telethon المركزي (مستقر جداً مع إعادة اتصال تلقائية)
 # ═══════════════════════════════════════════════════════════════════════════
 class SessionManager:
     def __init__(self):
@@ -1077,13 +1079,31 @@ def block_callback(update: Update, context: CallbackContext):
         query.edit_message_text("📝 تم حظر هذا النص.")
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ⏹️ معالجة الإشارات للخروج النظيف
+# ⏹️ إيقاف ذاتي بعد مدة محددة لحفظ البيانات قبل timeout
 # ═══════════════════════════════════════════════════════════════════════════
+updater_instance = None
+
+def schedule_shutdown(duration_seconds):
+    def stop():
+        logger.info("Self-timer: Stopping bot to save cache...")
+        if updater_instance:
+            updater_instance.stop()
+        for uid in list(session_manager.clients.keys()):
+            session_manager.stop_user_monitoring(uid)
+        logger.info("All monitors stopped. Exiting.")
+        sys.exit(0)
+
+    timer = threading.Timer(duration_seconds, stop)
+    timer.daemon = True
+    timer.start()
+    logger.info(f"Self-timer set: bot will stop after {duration_seconds} seconds")
+
 def graceful_shutdown(signum, frame):
     logger.info("Received signal to stop. Shutting down gracefully...")
-    # إيقاف المراقبة لكل المستخدمين النشطين
-    for user_id in list(session_manager.clients.keys()):
-        session_manager.stop_user_monitoring(user_id)
+    if updater_instance:
+        updater_instance.stop()
+    for uid in list(session_manager.clients.keys()):
+        session_manager.stop_user_monitoring(uid)
     sys.exit(0)
 
 signal.signal(signal.SIGTERM, graceful_shutdown)
@@ -1093,9 +1113,11 @@ signal.signal(signal.SIGINT, graceful_shutdown)
 # 🎬 الدالة الرئيسية
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
+    global updater_instance
     session_manager.start_background_loop()
 
     updater = Updater(BOT_TOKEN, use_context=True)
+    updater_instance = updater
     dp = updater.dispatcher
     bot = updater.bot
     session_manager.set_bot(bot)
@@ -1116,6 +1138,8 @@ def main():
     dp.add_handler(CommandHandler("stop_monitoring", stop_monitoring))
     dp.add_handler(CommandHandler("status", status))
     dp.add_handler(CallbackQueryHandler(block_callback, pattern='^block_'))
+
+    schedule_shutdown(RUN_DURATION)
 
     updater.start_polling()
     logger.info("🤖 Bot started!")
