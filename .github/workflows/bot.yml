@@ -2,13 +2,13 @@ name: Radar Bot (GitHub Actions)
 
 on:
   schedule:
-    - cron: '*/50 * * * *'   # كل 50 دقيقة
+    - cron: '*/55 * * * *'   # كل 55 دقيقة
   workflow_dispatch:          # تشغيل يدوي
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 55       # أقل من 6 ساعات
+    timeout-minutes: 60       # أقصى مدة 60 دقيقة
 
     steps:
       - name: Checkout code
@@ -35,7 +35,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
-          RUN_DURATION: 3000    # 50 دقيقة
+          RUN_DURATION: 3300    # 55 دقيقة
         run: python bot_github.py
 
       - name: Save cache
