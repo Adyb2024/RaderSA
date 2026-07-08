@@ -1,0 +1,30 @@
+name: Radar Bot (GitHub Actions)
+
+on:
+  schedule:
+    - cron: '*/50 * * * *'   # كل 50 دقيقة
+  workflow_dispatch:          # تشغيل يدوي
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55       # أقل من 6 ساعات، ويكفي لـ 50 دقيقة تشغيل
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: python bot_github.py
