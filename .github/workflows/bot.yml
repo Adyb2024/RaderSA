@@ -8,7 +8,7 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 60       # أقصى مدة 60 دقيقة
+    timeout-minutes: 60
 
     steps:
       - name: Checkout code
@@ -22,25 +22,25 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Restore cache
+      - name: Restore persistent cache
         uses: actions/cache@v3
         with:
           path: ./data
-          key: data-cache-${{ github.run_id }}
+          key: data-cache-main
           restore-keys: |
-            data-cache-
+            data-cache-main
 
       - name: Run bot
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
-          RUN_DURATION: 3300    # 55 دقيقة
+          RUN_DURATION: 3300
         run: python bot_github.py
 
-      - name: Save cache
+      - name: Save persistent cache
         if: always()
         uses: actions/cache@v3
         with:
           path: ./data
-          key: data-cache-${{ github.run_id }}
+          key: data-cache-main
